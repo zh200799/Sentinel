@@ -56,9 +56,12 @@ public class RateLimiterController implements TrafficShapingController {
 
         long currentTime = TimeUtil.currentTimeMillis();
         // Calculate the interval between every two requests.
+        // 计算每两个请求之间的间隔
+        // qps 10/s 时, count 为 10, acquireCount 默认为 1, costTime = 100 ms
         long costTime = Math.round(1.0 * (acquireCount) / count * 1000);
 
         // Expected pass time of this request.
+        // 计算期待的收到请求的时间
         long expectedTime = costTime + latestPassedTime.get();
 
         if (expectedTime <= currentTime) {

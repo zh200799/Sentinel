@@ -117,9 +117,10 @@ public abstract class LeapArray<T> {
         if (timeMillis < 0) {
             return null;
         }
-
+        // 计算当前时间戳落到哪个桶
         int idx = calculateTimeIdx(timeMillis);
         // Calculate current bucket start time.
+        // 计算当前桶的开始时间
         long windowStart = calculateWindowStart(timeMillis);
 
         /*
@@ -133,6 +134,8 @@ public abstract class LeapArray<T> {
             WindowWrap<T> old = array.get(idx);
             if (old == null) {
                 /*
+                 * 桶不存在, 创建一个新桶,并以 CAS 方式更新到数组
+                 *
                  *     B0       B1      B2    NULL      B4
                  * ||_______|_______|_______|_______|_______||___
                  * 200     400     600     800     1000    1200  timestamp
@@ -144,16 +147,20 @@ public abstract class LeapArray<T> {
                  * then try to update circular array via a CAS operation. Only one thread can
                  * succeed to update, while other threads yield its time slice.
                  */
+                // 创建新桶
                 WindowWrap<T> window = new WindowWrap<T>(windowLengthInMs, windowStart, newEmptyBucket(timeMillis));
                 if (array.compareAndSet(idx, null, window)) {
                     // Successfully updated, return the created bucket.
+                    // CAS 更新成功, 返回新桶
                     return window;
                 } else {
                     // Contention failed, the thread will yield its time slice to wait for bucket available.
+                    // 争用失败,线程让出 CPU 时间片,等待通可用
                     Thread.yield();
                 }
             } else if (windowStart == old.windowStart()) {
                 /*
+                 * 当前时间戳对应的桶, 与 array 中获取到的桶为一个时, 直接返回
                  *     B0       B1      B2     B3      B4
                  * ||_______|_______|_______|_______|_______||___
                  * 200     400     600     800     1000    1200  timestamp
@@ -167,7 +174,8 @@ public abstract class LeapArray<T> {
                 return old;
             } else if (windowStart > old.windowStart()) {
                 /*
-                 *   (old)
+                 * 当前时间戳对应的桶开始时间等于 array 中获取的桶的 开始时间, 则 array 中桶过期,需要重置
+                 *    (old)
                  *             B0       B1      B2    NULL      B4
                  * |_______||_______|_______|_______|_______|_______||___
                  * ...    1200     1400    1600    1800    2000    2200  timestamp
@@ -196,6 +204,7 @@ public abstract class LeapArray<T> {
                 }
             } else if (windowStart < old.windowStart()) {
                 // Should not go through here, as the provided time is already behind.
+                // 时钟回拨时会触发
                 return new WindowWrap<T>(windowLengthInMs, windowStart, newEmptyBucket(timeMillis));
             }
         }

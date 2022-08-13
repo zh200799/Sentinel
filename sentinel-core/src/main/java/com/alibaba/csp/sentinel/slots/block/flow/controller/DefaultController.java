@@ -31,8 +31,9 @@ import com.alibaba.csp.sentinel.util.TimeUtil;
 public class DefaultController implements TrafficShapingController {
 
     private static final int DEFAULT_AVG_USED_TOKENS = 0;
-
+    // 限流阈值
     private double count;
+    // 阈值类型, 0 thread,1 qps
     private int grade;
 
     public DefaultController(double count, int grade) {
@@ -47,12 +48,16 @@ public class DefaultController implements TrafficShapingController {
 
     @Override
     public boolean canPass(Node node, int acquireCount, boolean prioritized) {
+        // 获取已使用 token, 根据阈值类型 qps/线程数 获取当前窗口已有请求数/已使用线程数
         int curCount = avgUsedTokens(node);
+        // 判断是否超过阈值
         if (curCount + acquireCount > count) {
+            // QPS 类型流控 且 开启请求优先级时
             if (prioritized && grade == RuleConstant.FLOW_GRADE_QPS) {
                 long currentTime;
                 long waitInMs;
                 currentTime = TimeUtil.currentTimeMillis();
+                // 尝试占取下一个时间窗口
                 waitInMs = node.tryOccupyNext(currentTime, acquireCount, count);
                 if (waitInMs < OccupyTimeoutProperty.getOccupyTimeout()) {
                     node.addWaitingRequest(currentTime + waitInMs, acquireCount);

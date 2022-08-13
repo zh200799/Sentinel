@@ -72,6 +72,7 @@ public abstract class AbstractCircuitBreaker implements CircuitBreaker {
         }
         if (currentState.get() == State.OPEN) {
             // For half-open state we allow a request for probing.
+            // 熔断时间到, 则改为半开
             return retryTimeoutArrived() && fromOpenToHalfOpen(context);
         }
         return false;
@@ -82,6 +83,7 @@ public abstract class AbstractCircuitBreaker implements CircuitBreaker {
      */
     abstract void resetStat();
 
+    // 判断熔断时间释放到期
     protected boolean retryTimeoutArrived() {
         return TimeUtil.currentTimeMillis() >= nextRetryTimestamp;
     }
